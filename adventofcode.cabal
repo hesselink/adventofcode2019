@@ -1,10 +1,10 @@
-cabal-version:       >=1.10
+cabal-version:       2.2
 
 name:                adventofcode
 version:             2019
 synopsis:            Advent of code 2019 solutions
 description:         Advent of code 2019 solutions in Haskell by Erik Hesselink
-license:             BSD3
+license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Erik Hesselink
 maintainer:          hesselink@gmail.com
@@ -15,54 +15,63 @@ Source-Repository head
   Type:                git
   Location:            git://github.com/hesselink/adventofcode2019.git
 
-executable 1
-  main-is:             Main.hs
+common shared-settings
   build-depends:       base >=4.9 && <4.13
-  hs-source-dirs:      1
+  ghc-options:         -Wall
   default-language:    Haskell2010
+
+library
+  import:              shared-settings
+  hs-source-dirs:      lib
+  exposed-modules:     IntCode
+  build-depends:       base >=4.9 && <4.13
+                     , mtl
+
+executable 1
+  import:              shared-settings
+  main-is:             Main.hs
+  hs-source-dirs:      1
 
 executable 2
+  import:              shared-settings
   main-is:             Main.hs
-  build-depends:       base >=4.9 && <4.13
-                     , mtl
+  build-depends:       mtl
                      , split
+                     , adventofcode
+                     , safe
   hs-source-dirs:      2
-  default-language:    Haskell2010
 
 executable 3
+  import:              shared-settings
   main-is:             Main.hs
-  build-depends:       base >=4.9 && <4.13
-                     , containers
+  build-depends:       containers
                      , split
   hs-source-dirs:      3
-  default-language:    Haskell2010
 
 executable 4
+  import:              shared-settings
   main-is:             Main.hs
-  build-depends:       base >=4.9 && <4.13
   hs-source-dirs:      4
-  default-language:    Haskell2010
 
 executable 5
+  import:              shared-settings
   main-is:             Main.hs
-  build-depends:       base >=4.9 && <4.13
-                     , mtl
+  build-depends:       mtl
                      , split
+                     , adventofcode
   hs-source-dirs:      5
-  default-language:    Haskell2010
 
 executable 6
+  import:              shared-settings
   main-is:             Main.hs
-  build-depends:       base >=4.9 && <4.13
-                     , hashable
+  build-depends:       hashable
                      , fgl
   hs-source-dirs:      6
-  default-language:    Haskell2010
 
 executable 7
+  import:              shared-settings
   main-is:             Main.hs
-  build-depends:       base >=4.9 && <4.13
-                     , mtl
+  build-depends:       mtl
                      , split
+                     , adventofcode
   hs-source-dirs:      7
-  default-language:    Haskell2010
