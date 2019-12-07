@@ -1,6 +1,6 @@
 main :: IO ()
 main = do
-  f <- readFile "input"
+  f <- readFile "input/1"
   let masses = map read . lines $ f
       result = sum . map fuelForMass $ masses
   print result

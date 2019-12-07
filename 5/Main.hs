@@ -1,8 +1,3 @@
-#!/usr/bin/env stack
-{- stack script
-   --resolver lts-14.14
-   --package split
--}
 import Control.Monad.State
 import Control.Applicative ((<|>))
 import Data.Maybe (fromJust, listToMaybe)
@@ -14,7 +9,7 @@ import qualified Text.ParserCombinators.ReadP as P
 
 main :: IO ()
 main = do
-  f <- readFile "input"
+  f <- readFile "input/5"
   let initialMem = map read . splitOn "," $ f
       (_, out) = run [1] initialMem
   print (head out)

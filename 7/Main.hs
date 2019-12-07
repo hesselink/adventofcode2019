@@ -14,7 +14,7 @@ import qualified Text.ParserCombinators.ReadP as P
 
 main :: IO ()
 main = do
-  f <- readFile "input"
+  f <- readFile "input/7"
   let initialMem = map read . splitOn "," $ f
       maxOutput = findMaxOutput initialMem
   print maxOutput

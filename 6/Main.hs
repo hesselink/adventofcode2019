@@ -1,8 +1,3 @@
-{- stack script
-   --resolver lts-14.14
-   --package hashable
-   --package fgl
--}
 import qualified Data.Graph.Inductive.Graph as Graph
 import Data.Graph.Inductive.PatriciaTree (Gr)
 import qualified Data.Graph.Inductive.Query.SP as Graph
@@ -12,7 +7,7 @@ import Data.Maybe (fromJust)
 
 main :: IO ()
 main = do
-  f <- readFile "input"
+  f <- readFile "input/6"
   let orbits = parseOrbits f
       count = countOrbits orbits
   print count

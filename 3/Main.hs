@@ -1,8 +1,3 @@
-#!/usr/bin/env stack
-{- stack script
-   --resolver lts-14.14
-   --package split
--}
 {-# LANGUAGE TupleSections #-}
 import Data.List.Split
 import Text.Read (readMaybe)
@@ -17,7 +12,7 @@ import qualified Data.Set as Set
 
 main :: IO ()
 main = do
-  f <- readFile "input"
+  f <- readFile "input/3"
   let stepsLines = map parseSteps . lines $ f
       positions = map allPositions stepsLines
       wires = Map.unionsWith Set.union $ map (uncurry wireFromIndexAndPositions) (zip [0..] positions)

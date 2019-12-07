@@ -1,12 +1,10 @@
-#!/usr/bin/env stack
--- stack --resolver lts-14.14 --install-ghc runghc --package split
 import Control.Monad.State
 import Data.Maybe (fromJust)
 import Data.List.Split (splitOn)
 
 main :: IO ()
 main = do
-  f <- readFile "input"
+  f <- readFile "input/2"
   let numbers = map read . splitOn "," $ f
       result = run . restoreGravityAssist $ numbers
   print (head result)
