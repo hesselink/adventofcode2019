@@ -75,3 +75,9 @@ executable 7
                      , split
                      , adventofcode
   hs-source-dirs:      7
+
+executable 8
+  import:              shared-settings
+  main-is:             Main.hs
+  build-depends:       split
+  hs-source-dirs:      8
