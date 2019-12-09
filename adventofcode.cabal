@@ -86,4 +86,5 @@ executable 9
   import:              shared-settings
   main-is:             Main.hs
   build-depends:       split
+                     , adventofcode
   hs-source-dirs:      9
