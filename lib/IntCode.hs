@@ -1,24 +1,16 @@
+{-# LANGUAGE TupleSections #-}
 module IntCode where
 
 import Control.Monad.State
 import Control.Applicative ((<|>))
-import Data.Maybe (fromJust, listToMaybe)
-import Data.List (intercalate)
+import Data.Maybe (fromJust, listToMaybe, fromMaybe)
 import Text.ParserCombinators.ReadP (ReadP)
+import Data.Map (Map)
 import Data.List.Split (splitOn)
 import qualified Text.ParserCombinators.ReadP as P
+import qualified Data.Map as Map
 
-data Instr
-  = Add Param Param OutParam
-  | Mul Param Param OutParam
-  | Input OutParam
-  | Output Param
-  | JumpIfTrue Param Param
-  | JumpIfFalse Param Param
-  | LessThan Param Param OutParam
-  | Equal Param Param OutParam
-  | AdjustRelativeBase Param
-  | Halt
+data Instr = Instr OpCode [ParamMode]
   deriving Show
 
 data OpCode
@@ -48,15 +40,15 @@ data ParamMode
   | PMRelative
   deriving (Show, Eq)
 
-newtype Address = Address Int deriving Show
+newtype Address = Address Int deriving (Show, Eq, Ord)
 newtype Value = Value Integer deriving Show
 newtype Offset = Offset Int deriving Show
 
-type Memory = [Integer]
+type Memory = Map Address Integer
 
 data InterpreterState = InterpreterState
   { memory :: Memory
-  , position :: Int
+  , position :: Address
   , inputs :: [Integer]
   , outputs :: [Integer]
   , done :: Bool
@@ -67,7 +59,7 @@ data InterpreterState = InterpreterState
 type Interpreter = State InterpreterState
 
 parseMemory :: String -> Memory
-parseMemory = map read . splitOn ","
+parseMemory = Map.fromAscList . zip (map Address [0..]) . map read . splitOn ","
 
 memoryFromInputFile :: String -> IO Memory
 memoryFromInputFile fileName = parseMemory <$> readFile ("input/" ++ fileName)
@@ -79,10 +71,10 @@ exec :: [Integer] -> Memory -> [Integer]
 exec = execLabeled "<no label>"
 
 runLabeled :: String -> [Integer] -> Memory -> (Memory, [Integer])
-runLabeled l is vs = evalState run' InterpreterState
-  { memory = vs ++ repeat 0
-  , position = 0
-  , inputs = is
+runLabeled l is mem = evalState run' InterpreterState
+  { memory = mem
+  , position = Address 0
+  , inputs = is ++ repeat 0
   , outputs = []
   , done = False
   , label = l
@@ -100,94 +92,26 @@ run' = do
 
 step :: Interpreter ()
 step = do
-  st <- get
-  let vs = drop (position st) (memory st)
-      op = fromJust $ parseInstr vs
-  runInstr op
+  instr <- readInstr
+  runInstr instr
 
-parseInstr :: Memory -> Maybe Instr
-parseInstr mem = runParser pInstr (intercalate "," . map show $ mem)
+readInstr :: Interpreter Instr
+readInstr = do
+  st <- get
+  let instrStr = show $ readAt (position st) (memory st)
+      instr = runParser pInstr instrStr
+  modify $ \s -> s { position = position st `offset` Offset 1 }
+  return (fromJust instr)
 
 type Parser = ReadP
 
 runParser :: Parser a -> String -> Maybe a
-runParser p = fmap fst . listToMaybe . P.readP_to_S p
+runParser p = fmap fst . listToMaybe . filter ((== "") . snd) . P.readP_to_S p
 
 pInstr :: Parser Instr
-pInstr =  pAdd <|> pMul <|> pInput <|> pOutput <|> pJumpIfTrue <|> pJumpIfFalse <|> pLessThan
-      <|> pEquals <|> pAdjustRelativeBase <|> pHalt
-
-pAdd :: Parser Instr
-pAdd = pThreeParamInstr OpAdd Add
-
-pMul :: Parser Instr
-pMul = pThreeParamInstr OpMul Mul
-
-pLessThan :: Parser Instr
-pLessThan = pThreeParamInstr OpLessThan LessThan
-
-pEquals :: Parser Instr
-pEquals = pThreeParamInstr OpEqual Equal
-
-pJumpIfFalse :: Parser Instr
-pJumpIfFalse = pTwoParamInstr OpJumpIfFalse JumpIfFalse
-
-pJumpIfTrue :: Parser Instr
-pJumpIfTrue = pTwoParamInstr OpJumpIfTrue JumpIfTrue
-
-pInput :: Parser Instr
-pInput = do
-  (m:_) <- guardInstr OpInput
-  pComma
-  p1 <- pInt
-  return $ Input (mkOutParam m p1)
-
-pOutput :: Parser Instr
-pOutput = do
-  (m:_) <- guardInstr OpOutput
-  pComma
-  p1 <- pInt
-  return $ Output (mkParam m p1)
-
-pAdjustRelativeBase :: Parser Instr
-pAdjustRelativeBase = do
-  (m:_) <- guardInstr OpAdjustRelativeBase
-  pComma
-  p1 <- pInt
-  return $ AdjustRelativeBase (mkParam m p1)
-
-pThreeParamInstr :: OpCode -> (Param -> Param -> OutParam -> Instr) -> Parser Instr
-pThreeParamInstr opCode constr = do
-  (m1:m2:m3:_) <- guardInstr opCode
-  pComma
-  p1 <- pInt
-  pComma
-  p2 <- pInt
-  pComma
-  p3 <- pInt
-  return $ constr (mkParam m1 p1) (mkParam m2 p2) (mkOutParam m3 p3)
-
-pTwoParamInstr :: OpCode -> (Param -> Param -> Instr) -> Parser Instr
-pTwoParamInstr opCode constr = do
-  (m1:m2:_) <- guardInstr opCode
-  pComma
-  p1 <- pInt
-  pComma
-  p2 <- pInt
-  return $ constr (mkParam m1 p1) (mkParam m2 p2)
-
-guardInstr :: OpCode -> Parser [ParamMode]
-guardInstr wantedOpCode = do
-  (revParamModes, opCode) <- pInstrHeader
-  let paramModes = reverse revParamModes ++ repeat PMAddress
-  guard (opCode == wantedOpCode)
-  return paramModes
-
-pHalt :: Parser Instr
-pHalt = Halt <$ P.string "99"
-
-pInstrHeader :: Parser ([ParamMode], OpCode)
-pInstrHeader = (,) <$> P.many pParamMode <*> pOpCode
+pInstr = (\ms cd -> Instr cd (addDefaultModes cd ms)) <$> P.many pParamMode <*> pOpCode
+  where
+    addDefaultModes cd ms = reverse ms ++ drop (length ms) (replicate (numParams cd) PMAddress)
 
 pParamMode :: Parser ParamMode
 pParamMode =  PMAddress  <$ P.char '0'
@@ -225,87 +149,103 @@ mkOutParam PMAddress = OAddress . Address . fromIntegral
 mkOutParam PMValue = error "Out param with value mode"
 mkOutParam PMRelative = ORelative . Offset . fromIntegral
 
-sizeOf :: Instr -> Int
-sizeOf _q@Add{} = 4
-sizeOf _q@Mul{} = 4
-sizeOf _q@Input{} = 2
-sizeOf _q@Output{} = 2
-sizeOf _q@JumpIfTrue{} = 3
-sizeOf _q@JumpIfFalse{} = 3
-sizeOf _q@LessThan{} = 4
-sizeOf _q@Equal{} = 4
-sizeOf _q@AdjustRelativeBase{} = 2
-sizeOf _q@Halt{} = 1
+numParams :: OpCode -> Int
+numParams OpAdd = 3
+numParams OpMul = 3
+numParams OpInput = 1
+numParams OpOutput = 1
+numParams OpJumpIfTrue = 2
+numParams OpJumpIfFalse = 2
+numParams OpLessThan = 3
+numParams OpEqual = 3
+numParams OpAdjustRelativeBase = 1
+numParams OpHalt = 0
 
 runInstr :: Instr -> Interpreter ()
-runInstr op = do
+runInstr (Instr op modes) = do
   st <- get
   let mem = memory st
-      nextPosition = position st + sizeOf op
   case op of
-    (Add x y z) -> do
-      v1 <- resolveParam x
-      v2 <- resolveParam y
-      v3 <- resolveOutParam z
-      put st { memory = setAt v3 (v1 + v2) mem, position = nextPosition }
-    (Mul x y z) -> do
-      v1 <- resolveParam x
-      v2 <- resolveParam y
-      v3 <- resolveOutParam z
-      put st { memory = setAt v3 (v1 * v2) mem, position = nextPosition }
-    (Input x) -> do
+    OpAdd -> do
+      v1 <- resolveParam (modes !! 0)
+      v2 <- resolveParam (modes !! 1)
+      v3 <- resolveOutParam (modes !! 2)
+      modify $ \s -> s { memory = setAt v3 (v1 + v2) mem }
+    OpMul -> do
+      v1 <- resolveParam (modes !! 0)
+      v2 <- resolveParam (modes !! 1)
+      v3 <- resolveOutParam (modes !! 2)
+      modify $ \s -> s { memory = setAt v3 (v1 * v2) mem }
+    OpInput -> do
       let (i:is) = inputs st
-      v <- resolveOutParam x
-      put st { memory = setAt v i mem, inputs = is, position = nextPosition }
-    (Output x) -> do
-      v <- resolveParam x
-      put st { outputs = outputs st ++ [v], position = nextPosition }
-    (JumpIfTrue p t) -> do
-      v1 <- resolveParam p
-      v2 <- resolveParam t
-      if v1 /= 0
-      then put st { position = fromIntegral v2 }
-      else put st { position = nextPosition }
-    (JumpIfFalse p t) -> do
-      v1 <- resolveParam p
-      v2 <- resolveParam t
-      if v1 == 0
-      then put st { position = fromIntegral v2 }
-      else put st { position = nextPosition }
-    (LessThan x y z) -> do
-      v1 <- resolveParam x
-      v2 <- resolveParam y
-      v3 <- resolveOutParam z
-      put st { memory = setAt v3 (if v1 < v2 then 1 else 0) mem, position = nextPosition }
-    (Equal x y z) -> do
-      v1 <- resolveParam x
-      v2 <- resolveParam y
-      v3 <- resolveOutParam z
-      put st { memory = setAt v3 (if v1 == v2 then 1 else 0) mem, position = nextPosition }
-    (AdjustRelativeBase x) -> do
-      v <- resolveParam x
-      put st { relativeBase = relativeBase st `offset` (Offset . fromIntegral $ v), position = nextPosition }
-    Halt -> put st { done = True }
+      v <- resolveOutParam (modes !! 0)
+      modify $ \s -> s { memory = setAt v i mem, inputs = is }
+    OpOutput -> do
+      v <- resolveParam (modes !! 0)
+      modify $ \s -> s { outputs = outputs s ++ [v] }
+    OpJumpIfTrue -> do
+      v1 <- resolveParam (modes !! 0)
+      v2 <- resolveParam (modes !! 1)
+      when (v1 /= 0) $ modify $ \s -> s { position = Address (fromIntegral v2) }
+    OpJumpIfFalse -> do
+      v1 <- resolveParam (modes !! 0)
+      v2 <- resolveParam (modes !! 1)
+      when (v1 == 0) $ modify $ \s -> s { position = Address (fromIntegral v2) }
+    OpLessThan -> do
+      v1 <- resolveParam (modes !! 0)
+      v2 <- resolveParam (modes !! 1)
+      v3 <- resolveOutParam (modes !! 2)
+      modify $ \s -> s { memory = setAt v3 (if v1 < v2 then 1 else 0) mem }
+    OpEqual -> do
+      v1 <- resolveParam (modes !! 0)
+      v2 <- resolveParam (modes !! 1)
+      v3 <- resolveOutParam (modes !! 2)
+      modify $ \s -> s { memory = setAt v3 (if v1 == v2 then 1 else 0) mem }
+    OpAdjustRelativeBase -> do
+      v <- resolveParam (modes !! 0)
+      modify $ \s -> s { relativeBase = relativeBase s `offset` (Offset . fromIntegral $ v) }
+    OpHalt -> modify $ \s -> s { done = True }
 
-resolveParam :: Param -> Interpreter Integer
-resolveParam (PAddress (Address x)) = do
+resolveParam :: ParamMode -> Interpreter Integer
+resolveParam PMAddress = withNextValue $ \a -> do
   mem <- gets memory
-  return $ mem !! fromIntegral x -- safe, memory is infinite
-resolveParam (PValue (Value v)) = return v
-resolveParam (PRelative o) = do
-  base <- gets relativeBase
-  resolveParam (PAddress (base `offset` o))
+  return $ readAt (Address . fromIntegral $ a) mem
+resolveParam PMValue = withNextValue return
+resolveParam PMRelative = withNextValue $ \o -> do
+  st <- get
+  let mem = memory st
+      base = relativeBase st
+  return $ readAt (base `offset` Offset (fromIntegral o)) mem
 
-resolveOutParam :: OutParam -> Interpreter Address
-resolveOutParam (OAddress a) = return a
-resolveOutParam (ORelative o) = do
+resolveOutParam :: ParamMode -> Interpreter Address
+resolveOutParam PMAddress = withNextValue $ \a -> return (Address . fromIntegral $ a)
+resolveOutParam PMRelative = withNextValue $ \o -> do
   base <- gets relativeBase
-  return (base `offset` o)
+  return $ base `offset` Offset (fromIntegral o)
+resolveOutParam PMValue = error "Value mode for out parameter."
+
+withNextValue :: (Integer -> Interpreter a) -> Interpreter a
+withNextValue f = do
+  st <- get
+  let v = readAt (position st) (memory st)
+  res <- f v
+  modify $ \s -> s { position = position st `offset` Offset 1 }
+  return res
 
 offset :: Address -> Offset -> Address
 offset (Address a) (Offset o) = Address (a + o)
 
-setAt :: Address -> x -> [x] -> [x]
-setAt _ _ [] = []
-setAt (Address 0) v (_:xs) = v:xs
-setAt (Address n) v (x:xs) = x : setAt (Address $ n-1) v xs
+readAt :: Address -> Memory -> Integer
+readAt a = fromMaybe 0 . Map.lookup a
+
+setAt :: Address -> Integer -> Memory -> Memory
+setAt = Map.insert
+
+snapshotMemory :: Interpreter [Integer]
+snapshotMemory = do
+  st <- get
+  let (Address pos) = position st
+      poss = map Address [pos..pos+3]
+      mem = memory st
+      vs = map (flip readAt mem) poss
+  return vs

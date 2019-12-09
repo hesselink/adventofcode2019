@@ -26,6 +26,7 @@ library
   exposed-modules:     IntCode
   build-depends:       base >=4.9 && <4.13
                      , mtl
+                     , containers
                      , split
 
 executable 1

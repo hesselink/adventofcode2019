@@ -4,9 +4,10 @@ main :: IO ()
 main = do
   numbers <- memoryFromInputFile "2"
   let result = run [] . restoreGravityAssist $ numbers
-  print (head . fst $ result)
-  let inputs = [ (n, v) | n <- [0..99], v <- [0..99] ]
-      (rN, rV) = head [ (n, v) | (n, v) <- inputs, (head . fst . run [] . setInputs n v $ numbers) == 19690720 ]
+  print (readAt (Address 0) . fst $ result)
+  let is = [ (n, v) | n <- [0..99], v <- [0..99] ]
+      (rN, rV) = head [ (n, v) | (n, v) <- is,
+        (readAt (Address 0) . fst . run [] . setInputs n v $ numbers) == 19690720 ]
   print (100 * rN + rV)
 
 restoreGravityAssist :: Memory -> Memory
