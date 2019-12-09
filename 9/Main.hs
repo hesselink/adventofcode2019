@@ -7,3 +7,5 @@ main = do
   let program = map read . splitOn "," $ f
       output = exec [1] program
   print output
+  let output2 = exec [2] program
+  print output2
