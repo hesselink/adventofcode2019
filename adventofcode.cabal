@@ -86,3 +86,12 @@ executable 9
   main-is:             Main.hs
   build-depends:       adventofcode
   hs-source-dirs:      9
+
+test-suite library-tests
+  import:              shared-settings
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      tests
+  main-is:             Main.hs
+  build-depends:       tasty
+                     , tasty-hunit
+                     , adventofcode
