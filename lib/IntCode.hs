@@ -5,6 +5,7 @@ import Control.Applicative ((<|>))
 import Data.Maybe (fromJust, listToMaybe)
 import Data.List (intercalate)
 import Text.ParserCombinators.ReadP (ReadP)
+import Data.List.Split (splitOn)
 import qualified Text.ParserCombinators.ReadP as P
 
 data Instr
@@ -64,6 +65,12 @@ data InterpreterState = InterpreterState
   } deriving Show
 
 type Interpreter = State InterpreterState
+
+parseMemory :: String -> Memory
+parseMemory = map read . splitOn ","
+
+memoryFromInputFile :: String -> IO Memory
+memoryFromInputFile fileName = parseMemory <$> readFile ("input/" ++ fileName)
 
 execLabeled :: String -> [Integer] -> Memory -> [Integer]
 execLabeled l is = snd . runLabeled l is

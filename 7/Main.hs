@@ -1,13 +1,11 @@
 import Data.List (permutations)
-import Data.List.Split (splitOn)
 
 import IntCode
 
 main :: IO ()
 main = do
-  f <- readFile "input/7"
-  let initialMem = map read . splitOn "," $ f
-      maxOutput = findMaxOutput initialMem
+  initialMem <- memoryFromInputFile "7"
+  let maxOutput = findMaxOutput initialMem
   print maxOutput
   let maxOutput2 = findMaxOutputFeedback initialMem
   print maxOutput2
