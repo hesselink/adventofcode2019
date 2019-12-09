@@ -15,5 +15,5 @@ main = do
 restoreGravityAssist :: Memory -> Memory
 restoreGravityAssist = setInputs 12 2
 
-setInputs :: Int -> Int -> Memory -> Memory
+setInputs :: Integer -> Integer -> Memory -> Memory
 setInputs noun verb = setAt (Address 1) noun . setAt (Address 2) verb

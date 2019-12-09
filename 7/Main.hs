@@ -12,9 +12,9 @@ main = do
   let maxOutput2 = findMaxOutputFeedback initialMem
   print maxOutput2
 
-type Phase = Int
-type Input = Int
-type Output = Int
+type Phase = Integer
+type Input = Integer
+type Output = Integer
 
 findMaxOutputFeedback :: Memory -> Output
 findMaxOutputFeedback mem = maximum . map (runAmplifiersFeedback mem) $ permutations [5,6,7,8,9]

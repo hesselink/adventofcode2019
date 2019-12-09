@@ -48,16 +48,16 @@ data ParamMode
   deriving (Show, Eq)
 
 newtype Address = Address Int deriving Show
-newtype Value = Value Int deriving Show
+newtype Value = Value Integer deriving Show
 newtype Offset = Offset Int deriving Show
 
-type Memory = [Int]
+type Memory = [Integer]
 
 data InterpreterState = InterpreterState
   { memory :: Memory
   , position :: Int
-  , inputs :: [Int]
-  , outputs :: [Int]
+  , inputs :: [Integer]
+  , outputs :: [Integer]
   , done :: Bool
   , label :: String -- for debugging
   , relativeBase :: Address
@@ -65,15 +65,15 @@ data InterpreterState = InterpreterState
 
 type Interpreter = State InterpreterState
 
-execLabeled :: String -> [Int] -> Memory -> [Int]
+execLabeled :: String -> [Integer] -> Memory -> [Integer]
 execLabeled l is = snd . runLabeled l is
 
-exec :: [Int] -> Memory -> [Int]
+exec :: [Integer] -> Memory -> [Integer]
 exec = execLabeled "<no label>"
 
-runLabeled :: String -> [Int] -> Memory -> (Memory, [Int])
+runLabeled :: String -> [Integer] -> Memory -> (Memory, [Integer])
 runLabeled l is vs = evalState run' InterpreterState
-  { memory = vs
+  { memory = vs ++ repeat 0
   , position = 0
   , inputs = is
   , outputs = []
@@ -82,10 +82,10 @@ runLabeled l is vs = evalState run' InterpreterState
   , relativeBase = Address 0
   }
 
-run :: [Int] -> Memory -> (Memory, [Int])
+run :: [Integer] -> Memory -> (Memory, [Integer])
 run = runLabeled "<no label>"
 
-run' :: Interpreter (Memory, [Int])
+run' :: Interpreter (Memory, [Integer])
 run' = do
   step
   d <- gets done
@@ -199,7 +199,7 @@ pOpCode =  OpAdd                <$ P.optional (P.char '0') <* P.char '1'
        <|> OpAdjustRelativeBase <$ P.optional (P.char '0') <* P.char '9'
        <|> OpHalt               <$ P.string "99"
 
-pInt :: Parser Int
+pInt :: Parser Integer
 pInt = pRead
 
 pComma :: Parser ()
@@ -208,15 +208,15 @@ pComma = void $ P.char ','
 pRead :: Read a => Parser a
 pRead = P.readS_to_P reads
 
-mkParam :: ParamMode -> Int -> Param
-mkParam PMAddress = PAddress . Address
+mkParam :: ParamMode -> Integer -> Param
+mkParam PMAddress = PAddress . Address . fromIntegral
 mkParam PMValue = PValue . Value
-mkParam PMRelative = PRelative . Offset
+mkParam PMRelative = PRelative . Offset . fromIntegral
 
-mkOutParam :: ParamMode -> Int -> OutParam
-mkOutParam PMAddress = OAddress . Address
+mkOutParam :: ParamMode -> Integer -> OutParam
+mkOutParam PMAddress = OAddress . Address . fromIntegral
 mkOutParam PMValue = error "Out param with value mode"
-mkOutParam PMRelative = ORelative . Offset
+mkOutParam PMRelative = ORelative . Offset . fromIntegral
 
 sizeOf :: Instr -> Int
 sizeOf _q@Add{} = 4
@@ -257,13 +257,13 @@ runInstr op = do
       v1 <- resolveParam p
       v2 <- resolveParam t
       if v1 /= 0
-      then put st { position = v2 }
+      then put st { position = fromIntegral v2 }
       else put st { position = nextPosition }
     (JumpIfFalse p t) -> do
       v1 <- resolveParam p
       v2 <- resolveParam t
       if v1 == 0
-      then put st { position = v2 }
+      then put st { position = fromIntegral v2 }
       else put st { position = nextPosition }
     (LessThan x y z) -> do
       v1 <- resolveParam x
@@ -277,13 +277,13 @@ runInstr op = do
       put st { memory = setAt v3 (if v1 == v2 then 1 else 0) mem, position = nextPosition }
     (AdjustRelativeBase x) -> do
       v <- resolveParam x
-      put st { relativeBase = relativeBase st `offset` (Offset v), position = nextPosition }
+      put st { relativeBase = relativeBase st `offset` (Offset . fromIntegral $ v), position = nextPosition }
     Halt -> put st { done = True }
 
-resolveParam :: Param -> Interpreter Int
+resolveParam :: Param -> Interpreter Integer
 resolveParam (PAddress (Address x)) = do
   mem <- gets memory
-  return $ mem !! x
+  return $ mem !! fromIntegral x -- safe, memory is infinite
 resolveParam (PValue (Value v)) = return v
 resolveParam (PRelative o) = do
   base <- gets relativeBase
