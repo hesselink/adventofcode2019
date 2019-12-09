@@ -23,14 +23,9 @@ findMaxOutput :: Memory -> Output
 findMaxOutput mem = maximum . map (runAmplifiers mem) $ permutations [0,1,2,3,4]
 
 runAmplifiersFeedback :: Memory -> [Phase] -> Output
-runAmplifiersFeedback mem [p1,p2,p3,p4,p5] =
-  let (_, os1) = runLabeled "1" (p1:0:os5) mem
-      (_, os2) = runLabeled "2" (p2:os1) mem
-      (_, os3) = runLabeled "3" (p3:os2) mem
-      (_, os4) = runLabeled "4" (p4:os3) mem
-      (_, os5) = runLabeled "5" (p5:os4) mem
-  in last os5
-runAmplifiersFeedback _ _ = error "Pass 5 phases"
+runAmplifiersFeedback mem phases =
+  let result = foldr (\ph os -> exec (ph:os) mem) (0:result) phases
+  in last result
 
 runAmplifiers :: Memory -> [Phase] -> Output
 runAmplifiers mem = foldr (\ph i -> runAmplifier ph i mem) 0

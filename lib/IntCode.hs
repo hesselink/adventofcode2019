@@ -56,6 +56,12 @@ data InterpreterState = InterpreterState
 
 type Interpreter = State InterpreterState
 
+execLabeled :: String -> [Int] -> Memory -> [Int]
+execLabeled l is = snd . runLabeled l is
+
+exec :: [Int] -> Memory -> [Int]
+exec = execLabeled "<no label>"
+
 runLabeled :: String -> [Int] -> Memory -> (Memory, [Int])
 runLabeled l is vs = evalState run' (InterpreterState vs 0 is [] False l)
 

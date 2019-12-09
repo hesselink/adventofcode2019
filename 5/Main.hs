@@ -6,8 +6,7 @@ main :: IO ()
 main = do
   f <- readFile "input/5"
   let initialMem = map read . splitOn "," $ f
-      (_, out) = run [1] initialMem
+      out = exec [1] initialMem
   print (last out)
-  let (_, out2) = run [5] initialMem
+  let out2 = exec [5] initialMem
   print (last out2)
-  return ()
