@@ -89,7 +89,7 @@ run' :: Interpreter (Memory, [Integer])
 run' = do
   step
   d <- gets done
-  if d then gets (\s -> (memory s, reverse $ outputs s)) else run'
+  if d then gets (\s -> (memory s, outputs s)) else run'
 
 step :: Interpreter ()
 step = do
@@ -252,7 +252,7 @@ runInstr op = do
       put st { memory = setAt v i mem, inputs = is, position = nextPosition }
     (Output x) -> do
       v <- resolveParam x
-      put st { outputs = v : outputs st, position = nextPosition }
+      put st { outputs = outputs st ++ [v], position = nextPosition }
     (JumpIfTrue p t) -> do
       v1 <- resolveParam p
       v2 <- resolveParam t
