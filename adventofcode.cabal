@@ -28,6 +28,7 @@ library
                      , mtl
                      , containers
                      , split
+                     , dlist
 
 executable 1
   import:              shared-settings

@@ -9,6 +9,8 @@ import Data.Map (Map)
 import Data.List.Split (splitOn)
 import qualified Text.ParserCombinators.ReadP as P
 import qualified Data.Map as Map
+import Data.DList (DList, snoc)
+import GHC.Exts (IsList(toList))
 
 data Instr = Instr OpCode [ParamMode]
   deriving Show
@@ -50,7 +52,7 @@ data InterpreterState = InterpreterState
   { memory :: Memory
   , position :: Address
   , inputs :: [Integer]
-  , outputs :: [Integer]
+  , outputs :: DList Integer
   , done :: Bool
   , label :: String -- for debugging
   , relativeBase :: Address
@@ -75,7 +77,7 @@ runLabeled l is mem = evalState run' InterpreterState
   { memory = mem
   , position = Address 0
   , inputs = is ++ repeat 0
-  , outputs = []
+  , outputs = mempty
   , done = False
   , label = l
   , relativeBase = Address 0
@@ -88,7 +90,7 @@ run' :: Interpreter (Memory, [Integer])
 run' = do
   step
   d <- gets done
-  if d then gets (\s -> (memory s, outputs s)) else run'
+  if d then gets (\s -> (memory s, toList $ outputs s)) else run'
 
 step :: Interpreter ()
 step = do
@@ -182,7 +184,7 @@ runInstr (Instr op modes) = do
       modify $ \s -> s { memory = setAt v i mem, inputs = is }
     OpOutput -> do
       v <- resolveParam (modes !! 0)
-      modify $ \s -> s { outputs = outputs s ++ [v] }
+      modify $ \s -> s { outputs = snoc (outputs s) v }
     OpJumpIfTrue -> do
       v1 <- resolveParam (modes !! 0)
       v2 <- resolveParam (modes !! 1)
