@@ -2,11 +2,13 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.List.Split (chunksOf)
 import IntCode (memoryFromInputFile, exec, Memory)
+import Data.List (intercalate)
 
 main :: IO ()
 main = do
   program <- memoryFromInputFile "11"
-  print $ Set.size . Set.unions . map (snd . fst3) . runRobot $ program
+  print $ Set.size . Set.unions . runRobot Set.empty $ program
+  putStrLn $ printPanels . last . runRobot (Set.singleton (0,0)) $ program
 
 type Pos = (Int, Int)
 type Panels = Set Pos -- not present => black
@@ -17,15 +19,33 @@ data Robot = Robot
   , direction :: Direction
   } deriving Show
 
+printPanels :: Panels -> String
+printPanels panels =
+  let ps = Set.toList panels
+      (xs, ys) = unzip ps
+      minX = minimum xs
+      maxX = maximum xs
+      minY = minimum ys
+      maxY = maximum ys
+  in printPanels' minX maxX minY maxY panels
+
+printPanels' :: Int -> Int -> Int -> Int -> Panels -> String
+printPanels' minX maxX minY maxY panels
+  = intercalate "\n"
+  $ [ printLine minX maxX y panels | y <- [minY..maxY] ]
+
+printLine :: Int -> Int -> Int -> Panels -> String
+printLine minX maxX y panels = [ if Set.member (x,y) panels then '#' else '.' | x <- [minX..maxX] ]
+
 initialRobot :: Robot
 initialRobot = Robot (0,0) U
 
-runRobot :: Memory -> [((Robot, Panels), Integer, [Integer])]
-runRobot mem =
+runRobot :: Panels -> Memory -> [Panels]
+runRobot initialPanels mem =
   let os = exec is mem
       is = map (uncurry colorAtPosition) rs
-      rs = scanl moveRobot (initialRobot, Set.empty) (chunksOf 2 os)
-  in zip3 rs is (chunksOf 2 os)
+      rs = scanl moveRobot (initialRobot, initialPanels) (chunksOf 2 os)
+  in map snd rs
 
 moveRobot :: (Robot, Panels) -> [Integer] -> (Robot, Panels)
 moveRobot (r, ps) [color, turn] =
@@ -63,6 +83,3 @@ move U (x, y) = (x, y - 1)
 move R (x, y) = (x + 1, y)
 move D (x, y) = (x, y + 1)
 move L (x, y) = (x - 1, y)
-
-fst3 :: (x, y, z) -> x
-fst3 (x, _, _) = x
