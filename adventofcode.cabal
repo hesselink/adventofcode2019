@@ -87,6 +87,12 @@ executable 9
   build-depends:       adventofcode
   hs-source-dirs:      9
 
+executable 10
+  import:              shared-settings
+  main-is:             Main.hs
+  build-depends:       containers
+  hs-source-dirs:      10
+
 test-suite library-tests
   import:              shared-settings
   type:                exitcode-stdio-1.0
