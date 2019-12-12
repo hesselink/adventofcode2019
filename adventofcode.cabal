@@ -102,6 +102,11 @@ executable 11
                      , adventofcode
   hs-source-dirs:      11
 
+executable 12
+  import:              shared-settings
+  main-is:             Main.hs
+  hs-source-dirs:      12
+
 test-suite library-tests
   import:              shared-settings
   type:                exitcode-stdio-1.0
