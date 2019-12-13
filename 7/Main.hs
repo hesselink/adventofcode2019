@@ -29,4 +29,4 @@ runAmplifiers :: Memory -> [Phase] -> Output
 runAmplifiers mem = foldr (\ph i -> runAmplifier ph i mem) 0
 
 runAmplifier :: Phase -> Input -> Memory -> Output
-runAmplifier phase input = head . snd . run [phase, input]
+runAmplifier phase inp = head . snd . run [phase, inp]
