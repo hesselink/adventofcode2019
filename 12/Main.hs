@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveFunctor, DeriveFoldable #-}
-import Text.ParserCombinators.ReadP (ReadP)
-import Data.Maybe (listToMaybe, fromJust)
+import Data.Maybe (fromJust)
 import qualified Text.ParserCombinators.ReadP as P
 import Control.Applicative (liftA2)
 import Control.Arrow ((&&&))
 import Data.List (foldl1')
+
+import Parser
 
 main :: IO ()
 main = do
@@ -44,8 +45,8 @@ instance Applicative Triple where
   pure x = Triple x x x
   Triple f g h <*> Triple x y z = Triple (f x) (g y) (h z)
 
-type Pos = Triple Int
-type Vec = Triple Int
+type Pos = Triple Integer
+type Vec = Triple Integer
 data Moon = Moon
   { position :: Pos
   , velocity :: Vec
@@ -56,13 +57,13 @@ getX (Triple x _ _) = x
 getY (Triple _ y _) = y
 getZ (Triple _ _ z) = z
 
-potentialEnergy :: Moon -> Int
+potentialEnergy :: Moon -> Integer
 potentialEnergy = sum . abs . position
 
-kineticEnergy :: Moon -> Int
+kineticEnergy :: Moon -> Integer
 kineticEnergy = sum . abs . velocity
 
-energy :: Moon -> Int
+energy :: Moon -> Integer
 energy m = potentialEnergy m * kineticEnergy m
 
 applyGravity :: [Moon] -> [Moon]
@@ -78,7 +79,7 @@ applyGravity1 m ms =
       newVelocity = velocity m + offsets
   in m { position = pos + newVelocity, velocity = newVelocity }
 
-toOffset :: Ordering -> Int
+toOffset :: Ordering -> Integer
 toOffset LT = 1
 toOffset EQ = 0
 toOffset GT = -1
@@ -104,16 +105,3 @@ pPosition = Triple
   <*  P.string ", z="
   <*> pInt
   <*  P.string ">"
-
-
--- TODO refactor into lib
-type Parser = ReadP
-
-runParser :: Parser a -> String -> Maybe a
-runParser p = fmap fst . listToMaybe . filter ((== "") . snd) . P.readP_to_S p
-
-pInt :: Parser Int
-pInt = pRead
-
-pRead :: Read a => Parser a
-pRead = P.readS_to_P reads

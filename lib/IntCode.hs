@@ -6,8 +6,7 @@ module IntCode where
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Applicative ((<|>))
-import Data.Maybe (fromJust, listToMaybe, fromMaybe)
-import Text.ParserCombinators.ReadP (ReadP)
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Map (Map)
 import Data.List.Split (splitOn)
 import qualified Text.ParserCombinators.ReadP as P
@@ -15,6 +14,8 @@ import qualified Data.Map as Map
 import Data.DList (DList, snoc)
 import GHC.Exts (IsList(toList))
 import Control.Arrow (second)
+
+import Parser
 
 data Instr = Instr OpCode [ParamMode]
   deriving Show
@@ -164,11 +165,6 @@ readInstr = do
   modify $ \s -> s { position = position st `offset` Offset 1 }
   return (fromJust instr)
 
-type Parser = ReadP
-
-runParser :: Parser a -> String -> Maybe a
-runParser p = fmap fst . listToMaybe . filter ((== "") . snd) . P.readP_to_S p
-
 pInstr :: Parser Instr
 pInstr = (\ms cd -> Instr cd (addDefaultModes cd ms)) <$> P.many pParamMode <*> pOpCode
   where
@@ -190,15 +186,6 @@ pOpCode =  OpAdd                <$ P.optional (P.char '0') <* P.char '1'
        <|> OpEqual              <$ P.optional (P.char '0') <* P.char '8'
        <|> OpAdjustRelativeBase <$ P.optional (P.char '0') <* P.char '9'
        <|> OpHalt               <$ P.string "99"
-
-pInt :: Parser Integer
-pInt = pRead
-
-pComma :: Parser ()
-pComma = void $ P.char ','
-
-pRead :: Read a => Parser a
-pRead = P.readS_to_P reads
 
 mkParam :: ParamMode -> Integer -> Param
 mkParam PMAddress = PAddress . Address . fromIntegral

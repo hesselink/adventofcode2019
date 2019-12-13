@@ -24,6 +24,7 @@ library
   import:              shared-settings
   hs-source-dirs:      lib
   exposed-modules:     IntCode
+                     , Parser
   build-depends:       base >=4.9 && <4.13
                      , mtl
                      , containers
@@ -105,6 +106,7 @@ executable 11
 executable 12
   import:              shared-settings
   main-is:             Main.hs
+  build-depends:       adventofcode
   hs-source-dirs:      12
 
 executable 13
