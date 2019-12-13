@@ -50,11 +50,16 @@ data ParamMode
 newtype Address = Address Int deriving (Show, Eq, Ord)
 newtype Value = Value Integer deriving Show
 newtype Offset = Offset Int deriving Show
+data MemValue = MemValue
+  { value  :: Integer
+  , parsed :: Instr
+  } deriving Show
 
 type Memory = Map Address Integer
+type ParsedMemory = Map Address MemValue
 
 data InterpreterState = InterpreterState
-  { memory :: Memory
+  { memory :: ParsedMemory
   , position :: Address
   , done :: Bool
   , label :: String -- for debugging
@@ -136,7 +141,7 @@ runLabeledActions l inp outp mem = runReaderT (unActionMonadIntCode $ runLabeled
 
 runLabeledM :: MonadIntCode m => String -> Memory -> m Memory
 runLabeledM l mem = evalStateT run' InterpreterState
-  { memory = mem
+  { memory = Map.map parseMemValue mem
   , position = Address 0
   , done = False
   , label = l
@@ -150,7 +155,7 @@ run' :: MonadIntCode m => Interpreter m Memory
 run' = do
   step
   d <- gets done
-  if d then gets memory else run'
+  if d then Map.map value <$> gets memory else run'
 
 step :: MonadIntCode m => Interpreter m ()
 step = do
@@ -160,10 +165,9 @@ step = do
 readInstr :: Monad m => Interpreter m Instr
 readInstr = do
   st <- get
-  let instrStr = show $ readAt (position st) (memory st)
-      instr = runParser pInstr instrStr
+  let instr = readInstrAt (position st) (memory st)
   modify $ \s -> s { position = position st `offset` Offset 1 }
-  return (fromJust instr)
+  return instr
 
 pInstr :: Parser Instr
 pInstr = (\ms cd -> Instr cd (addDefaultModes cd ms)) <$> P.many pParamMode <*> pOpCode
@@ -176,16 +180,18 @@ pParamMode =  PMAddress  <$ P.char '0'
           <|> PMRelative <$ P.char '2'
 
 pOpCode :: Parser OpCode
-pOpCode =  OpAdd                <$ P.optional (P.char '0') <* P.char '1'
-       <|> OpMul                <$ P.optional (P.char '0') <* P.char '2'
-       <|> OpInput              <$ P.optional (P.char '0') <* P.char '3'
-       <|> OpOutput             <$ P.optional (P.char '0') <* P.char '4'
-       <|> OpJumpIfTrue         <$ P.optional (P.char '0') <* P.char '5'
-       <|> OpJumpIfFalse        <$ P.optional (P.char '0') <* P.char '6'
-       <|> OpLessThan           <$ P.optional (P.char '0') <* P.char '7'
-       <|> OpEqual              <$ P.optional (P.char '0') <* P.char '8'
-       <|> OpAdjustRelativeBase <$ P.optional (P.char '0') <* P.char '9'
-       <|> OpHalt               <$ P.string "99"
+pOpCode =  OpHalt               <$ P.string "99"
+       <|> P.optional (P.char '0') *>
+           (  OpAdd                <$ P.char '1'
+          <|> OpMul                <$ P.char '2'
+          <|> OpInput              <$ P.char '3'
+          <|> OpOutput             <$ P.char '4'
+          <|> OpJumpIfTrue         <$ P.char '5'
+          <|> OpJumpIfFalse        <$ P.char '6'
+          <|> OpLessThan           <$ P.char '7'
+          <|> OpEqual              <$ P.char '8'
+          <|> OpAdjustRelativeBase <$ P.char '9'
+           )
 
 mkParam :: ParamMode -> Integer -> Param
 mkParam PMAddress = PAddress . Address . fromIntegral
@@ -218,16 +224,16 @@ runInstr (Instr op modes) = do
       v1 <- resolveParam (modes !! 0)
       v2 <- resolveParam (modes !! 1)
       v3 <- resolveOutParam (modes !! 2)
-      modify $ \s -> s { memory = setAt v3 (v1 + v2) mem }
+      modify $ \s -> s { memory = setAt' v3 (v1 + v2) mem }
     OpMul -> do
       v1 <- resolveParam (modes !! 0)
       v2 <- resolveParam (modes !! 1)
       v3 <- resolveOutParam (modes !! 2)
-      modify $ \s -> s { memory = setAt v3 (v1 * v2) mem }
+      modify $ \s -> s { memory = setAt' v3 (v1 * v2) mem }
     OpInput -> do
       i <- input
       v <- resolveOutParam (modes !! 0)
-      modify $ \s -> s { memory = setAt v i mem }
+      modify $ \s -> s { memory = setAt' v i mem }
     OpOutput -> do
       v <- resolveParam (modes !! 0)
       output v
@@ -243,12 +249,12 @@ runInstr (Instr op modes) = do
       v1 <- resolveParam (modes !! 0)
       v2 <- resolveParam (modes !! 1)
       v3 <- resolveOutParam (modes !! 2)
-      modify $ \s -> s { memory = setAt v3 (if v1 < v2 then 1 else 0) mem }
+      modify $ \s -> s { memory = setAt' v3 (if v1 < v2 then 1 else 0) mem }
     OpEqual -> do
       v1 <- resolveParam (modes !! 0)
       v2 <- resolveParam (modes !! 1)
       v3 <- resolveOutParam (modes !! 2)
-      modify $ \s -> s { memory = setAt v3 (if v1 == v2 then 1 else 0) mem }
+      modify $ \s -> s { memory = setAt' v3 (if v1 == v2 then 1 else 0) mem }
     OpAdjustRelativeBase -> do
       v <- resolveParam (modes !! 0)
       modify $ \s -> s { relativeBase = relativeBase s `offset` (Offset . fromIntegral $ v) }
@@ -257,13 +263,13 @@ runInstr (Instr op modes) = do
 resolveParam :: Monad m => ParamMode -> Interpreter m Integer
 resolveParam PMAddress = withNextValue $ \a -> do
   mem <- gets memory
-  return $ readAt (Address . fromIntegral $ a) mem
+  return $ readValueAt (Address . fromIntegral $ a) mem
 resolveParam PMValue = withNextValue return
 resolveParam PMRelative = withNextValue $ \o -> do
   st <- get
   let mem = memory st
       base = relativeBase st
-  return $ readAt (base `offset` Offset (fromIntegral o)) mem
+  return $ readValueAt (base `offset` Offset (fromIntegral o)) mem
 
 resolveOutParam :: Monad m => ParamMode -> Interpreter m Address
 resolveOutParam PMAddress = withNextValue $ \a -> return (Address . fromIntegral $ a)
@@ -275,7 +281,7 @@ resolveOutParam PMValue = error "Value mode for out parameter."
 withNextValue :: Monad m => (Integer -> Interpreter m a) -> Interpreter m a
 withNextValue f = do
   st <- get
-  let v = readAt (position st) (memory st)
+  let v = readValueAt (position st) (memory st)
   res <- f v
   modify $ \s -> s { position = position st `offset` Offset 1 }
   return res
@@ -286,8 +292,26 @@ offset (Address a) (Offset o) = Address (a + o)
 readAt :: Address -> Memory -> Integer
 readAt a = fromMaybe 0 . Map.lookup a
 
+readValueAt :: Address -> ParsedMemory -> Integer
+readValueAt a = value . readAt' a
+
+readInstrAt :: Address -> ParsedMemory -> Instr
+readInstrAt a = parsed . readAt' a
+
+readAt' :: Address -> ParsedMemory -> MemValue
+readAt' a = fromMaybe (parseMemValue 0) . Map.lookup a
+
 setAt :: Address -> Integer -> Memory -> Memory
-setAt = Map.insert
+setAt a v mem = Map.insert a v mem
+
+setAt' :: Address -> Integer -> ParsedMemory -> ParsedMemory
+setAt' a v mem = Map.insert a (parseMemValue v) mem
+
+parseMemValue :: Integer -> MemValue
+parseMemValue v = MemValue
+  { value = v
+  , parsed = fromJust $ runParser pInstr (show v)
+  }
 
 snapshotMemory :: Monad m => Interpreter m [Integer]
 snapshotMemory = do
@@ -295,5 +319,5 @@ snapshotMemory = do
   let (Address pos) = position st
       poss = map Address [pos..pos+3]
       mem = memory st
-      vs = map (flip readAt mem) poss
+      vs = map (flip readValueAt mem) poss
   return vs
