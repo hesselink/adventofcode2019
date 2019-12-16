@@ -117,6 +117,11 @@ executable 13
                      , containers
   hs-source-dirs:      13
 
+executable 16
+  import:              shared-settings
+  main-is:             Main.hs
+  hs-source-dirs:      16
+
 test-suite library-tests
   import:              shared-settings
   type:                exitcode-stdio-1.0
