@@ -122,6 +122,14 @@ executable 16
   main-is:             Main.hs
   hs-source-dirs:      16
 
+executable 17
+  import:              shared-settings
+  main-is:             Main.hs
+  build-depends:       adventofcode
+                     , split
+  hs-source-dirs:      17
+
+
 test-suite library-tests
   import:              shared-settings
   type:                exitcode-stdio-1.0
