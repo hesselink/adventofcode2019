@@ -127,6 +127,7 @@ executable 17
   main-is:             Main.hs
   build-depends:       adventofcode
                      , split
+                     , containers
   hs-source-dirs:      17
 
 
