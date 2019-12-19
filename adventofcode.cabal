@@ -130,6 +130,11 @@ executable 17
                      , containers
   hs-source-dirs:      17
 
+executable 19
+  import:              shared-settings
+  main-is:             Main.hs
+  build-depends:       adventofcode
+  hs-source-dirs:      19
 
 test-suite library-tests
   import:              shared-settings
