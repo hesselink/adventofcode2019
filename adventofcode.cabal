@@ -134,6 +134,7 @@ executable 19
   import:              shared-settings
   main-is:             Main.hs
   build-depends:       adventofcode
+                     , split
   hs-source-dirs:      19
 
 test-suite library-tests
