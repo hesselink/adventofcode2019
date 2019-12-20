@@ -137,6 +137,14 @@ executable 19
                      , split
   hs-source-dirs:      19
 
+executable 20
+  import:              shared-settings
+  main-is:             Main.hs
+  build-depends:       fgl
+                     , hashable
+                     , containers
+  hs-source-dirs:      20
+
 test-suite library-tests
   import:              shared-settings
   type:                exitcode-stdio-1.0
