@@ -140,9 +140,9 @@ executable 19
 executable 20
   import:              shared-settings
   main-is:             Main.hs
-  build-depends:       fgl
-                     , hashable
+  build-depends:       astar
                      , containers
+                     , unordered-containers
   hs-source-dirs:      20
 
 test-suite library-tests

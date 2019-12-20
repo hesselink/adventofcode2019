@@ -1,56 +1,79 @@
-import Data.Graph.Inductive.Graph (LNode, LEdge, mkGraph, neighbors, lab, insEdges)
-import Data.Graph.Inductive.Tree (Gr)
-import Data.Graph.Inductive.Query.SP (sp)
-import Data.Hashable (hash)
+{-# LANGUAGE TupleSections #-}
+import Data.Graph.AStar
 import Data.Map (Map)
 import Data.Maybe (fromJust, fromMaybe, mapMaybe)
 import Data.Char (isLetter)
 import Control.Arrow (second)
+import Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
 import qualified Data.Map as Map
 
 main :: IO ()
 main = do
   f <- readFile "input/20"
-  let graph = buildGraph (lines f)
+  let byPos = Map.fromList
+            . concatMap (\(y, l) -> zipWith (\x c -> ((x, y), c)) [-2..] l)
+            . zip [-2..]
+            . lines
+            $ f
+      maxX = subtract 5 {- two letters on each side, plus one for zero index -} . length . head . lines $ f
+      maxY = subtract 5 . length . lines $ f
       labels = findLabels (lines f)
-      portalEdges = mkPortals labels
-      fullGraph = insEdges portalEdges graph
-      path = sp (hash . head . fromJust . Map.lookup "AA" $ labels) (hash . head . fromJust . Map.lookup "ZZ" $ labels) fullGraph
-  print (subtract 1 . length . fromJust $ path)
+      path1 = findPath False byPos labels (maxX, maxY)
+      path2 = findPath True byPos labels (maxX, maxY)
+  print (length . fromJust $ path1)
+  print (length . fromJust $ path2)
+
+findPath :: Bool -> Grid -> Labels -> Pos -> Maybe [Loc]
+findPath nestedLevels byPos labels maxPos =
+  let goalPos = (0, head . fromJust . Map.lookup "ZZ" $ labels)
+  in aStar
+       (findAdjacent nestedLevels byPos (labelsToEdges labels) maxPos)
+       (\_ _ -> 1)
+       (distanceEstimate goalPos)
+       (== goalPos)
+       (0, head . fromJust . Map.lookup "AA" $ labels)
 
 type Pos = (Int, Int)
+type Loc = (Int, Pos) -- level
 type Grid = Map Pos Char
-type Graph = Gr Pos Double
-type Node = LNode Pos
-type Edge = LEdge Double
 type Labels = Map String [Pos]
+type LabelEdges = Map Pos Pos
 
-buildGraph :: [String] -> Graph
-buildGraph ls =
-  let byPos = concatMap (\(y, l) -> zipWith (\x c -> ((x, y), c)) [-2..] l) . zip [-2..] $ ls
-      (ns, ess) = unzip $ map (uncurry $ mkNodeAndEdges (Map.fromList byPos)) byPos
-  in mkGraph ns (concat ess)
+labelsToEdges :: Labels -> LabelEdges
+labelsToEdges = Map.fromList . concatMap labelToEdges . filter ((== 2) . length) . Map.elems
 
-mkNodeAndEdges :: Grid -> Pos -> Char -> (Node, [Edge])
-mkNodeAndEdges gr p c =
-  case c of
-    '.' ->
-      let ns = openNeighbors gr p
-          nId = hash p
-          es = map (\np -> (nId, hash np, 1.0)) ns
-      in ((nId, p), es)
-    _ -> ((hash p, p), []) -- maybe not create anything?
+labelToEdges :: [Pos] -> [(Pos, Pos)]
+labelToEdges [p1,p2] = [(p1,p2), (p2,p1)]
+labelToEdges _ = error "Expected 2 positions"
 
-mkPortals :: Labels -> [Edge]
-mkPortals = concatMap mkPortal . Map.toList
+findAdjacent :: Bool -> Grid -> LabelEdges -> Pos -> Loc -> HashSet Loc
+findAdjacent nestedLevels gr labels maxPos loc@(lvl, pos) =
+  let neighbors = openNeighbors gr pos
+      throughPortal = portalConnection nestedLevels loc labels maxPos
+  in HashSet.union (HashSet.map (lvl,) neighbors) throughPortal
 
-mkPortal :: (String, [Pos]) -> [Edge]
-mkPortal (_, [_]) = []
-mkPortal (_, (p1:p2:[])) =
-  let id1 = hash p1
-      id2 = hash p2
-  in [(id1, id2, 1.0), (id2, id1, 1.0)]
-mkPortal (_, _) = error "Weird list size in mkPortal"
+portalConnection :: Bool -> Loc -> LabelEdges -> Pos -> HashSet Loc
+portalConnection nestedLevels (lvl, pos@(x,y)) labels (maxX, maxY) =
+  let other = Map.lookup pos labels
+      isOuter = x == 0 || y == 0 || x == maxX || y == maxY
+      offset = if nestedLevels
+               then if isOuter then -1 else 1
+               else 0
+  in if nestedLevels && lvl == 0 && isOuter
+     then HashSet.empty
+     else HashSet.fromList $ maybe [] (\p -> [(lvl + offset,p)]) other
+
+openNeighbors :: Grid -> Pos -> HashSet Pos
+openNeighbors gr (x,y) = HashSet.fromList
+  [ (x', y')
+  | (x', y') <- [(x-1,y), (x+1,y), (x,y-1), (x,y+1)]
+  , let mc = Map.lookup (x',y') gr
+  , mc == Just '.'
+  ]
+
+distanceEstimate :: Loc -> Loc -> Int
+distanceEstimate _ _ = 1 -- abs (x - xg) + abs (y - yg) This doesn't work anymore due to portals
 
 findLabels :: [String] -> Labels
 findLabels ls =
@@ -76,11 +99,3 @@ findLabel gr (x,y) c =
        then Just ([c,right], (x-1,y))
        else Nothing
   else Nothing
-
-openNeighbors :: Grid -> Pos -> [Pos]
-openNeighbors gr (x,y) =
-  [ (x', y')
-  | (x', y') <- [(x-1,y), (x+1,y), (x,y-1), (x,y+1)]
-  , let mc = Map.lookup (x',y') gr
-  , mc == Just '.'
-  ]
