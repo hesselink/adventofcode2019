@@ -145,6 +145,13 @@ executable 20
                      , unordered-containers
   hs-source-dirs:      20
 
+executable 21
+  import:              shared-settings
+  main-is:             Main.hs
+  build-depends:       adventofcode
+                     , smallcheck
+  hs-source-dirs:      21
+
 test-suite library-tests
   import:              shared-settings
   type:                exitcode-stdio-1.0
